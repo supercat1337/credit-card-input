@@ -255,7 +255,7 @@ import {
 
 ## 🧪 Full Example with Bootstrap 5
 
-A complete, working example with Bootstrap 5 styling is available in the [`/examples`](./examples) folder.
+A complete, working example with Bootstrap 5 styling is available in the [`/example`](./example) folder.
 
 ## 📄 License
 
