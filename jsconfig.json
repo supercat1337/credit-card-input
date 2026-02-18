@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ESNext",
+    "module": "NodeNext",
+    "noEmit": true,
+    "lib": ["ES2020", "es5", "es6", "dom", "dom.iterable"],
+    "moduleResolution": "NodeNext"
+  },
+  "exclude": ["node_modules"],
+  "include": ["src/index.js", "modules/**/*.d.ts"]
+}

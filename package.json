@@ -1,0 +1,30 @@
+{
+    "name": "@supercat1337/credit-card-input",
+    "version": "1.0.0",
+    "license": "MIT",
+    "author": "supercat1337",
+    "homepage": "https://github.com/supercat1337/credit-card-input",
+    "repository": {
+        "url": "git+https://github.com/supercat1337/credit-card-input.git",
+        "type": "git"
+    },
+    "type": "module",
+    "main": "./dist/credit-card-input.esm.js",
+    "imports": {
+        "#modules/*": "./modules/*"
+    },
+    "scripts": {
+        "create_types": "npm run remove_type_files && npx -p typescript tsc --project my.tsconfig.types.json",
+        "remove_type_files": "del /q *.d.ts *.d.ts.map dist\\*.d.ts dist\\*.d.ts.map",
+        "build": "npm run remove_type_files && npm run build_esm && npm run build_esm_bundle && npm run create_types",
+        "build_esm": "rollup ./src/index.js --file ./dist/credit-card-input.esm.js --format es",
+        "build_esm_bundle": "rollup ./src/index.js --file ./dist/credit-card-input.bundle.esm.js --format es -p ./node_modules/@rollup/plugin-node-resolve"
+    },
+    "devDependencies": {
+        "@types/node": "^25.0.10",
+        "@rollup/plugin-node-resolve": "^15.2.3"
+    },
+    "dependencies": {
+        "@supercat1337/event-emitter": "^2.0.0"
+    }
+}

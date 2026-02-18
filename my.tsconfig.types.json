@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "allowJs": true,
+        "target": "ESNext",
+        "module": "NodeNext",
+        "emitDeclarationOnly": true,
+        "declaration": true, 
+        "outDir": "./",
+        "rootDir": ".",
+        "declarationMap": false,
+        "moduleResolution": "NodeNext",
+        "stripInternal": false
+    },
+    "include": [
+        "./dist/credit-card-input.esm.js",
+        "./dist/credit-card-input.bundle.esm.js"
+    ],
+    "exclude": []
+}
