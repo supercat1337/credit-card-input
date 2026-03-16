@@ -719,7 +719,7 @@ class CreditCardInput {
             this.#expiryStatus === 'valid' &&
             this.#cvvStatus === 'valid';
 
-        if (allValidNow && this.#allValid !== allValidNow) {
+        if (this.#allValid !== allValidNow) {
             this.#allValid = allValidNow;
             this.#emit(allValidEvent, { isAllValid: allValidNow });
         }
