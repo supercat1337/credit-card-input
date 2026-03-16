@@ -82,6 +82,39 @@ const creditCard = new CreditCardInput({
     ignoreCvvLength: true,
 });
 
+creditCard.eventEmitter.logErrors = true;
+
+// Manage with focus
+creditCard.onInit(() => {
+    creditCard.expiryInput.addEventListener('input', () => {
+        setTimeout(() => {
+            if (creditCard.expiryInput.value.length === 0) {
+                creditCard.cardInput.focus();
+            }
+        }, 50);
+    });
+
+    creditCard.cvvInput.addEventListener('input', () => {
+        setTimeout(() => {
+            if (creditCard.cvvInput.value.length === 0) {
+                creditCard.expiryInput.focus();
+            }
+        }, 50);
+    });
+});
+
+creditCard.onCardStatus(({ status, type, isAmex }) => {
+    if (status === 'valid') {
+        creditCard.expiryInput.focus();
+    }
+});
+
+creditCard.onExpiryStatus(({ status }) => {
+    if (status === 'valid') {
+        creditCard.cvvInput.focus();
+    }
+});
+
 // Subscribe to events and update UI
 creditCard.onCardStatus(({ status, type, isAmex }) => {
     updateCardIcon(status);
