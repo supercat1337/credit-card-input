@@ -1,6 +1,6 @@
 // @ts-check
 
-import { CreditCardInput } from '../dist/credit-card-input.bundle.esm.js';
+import { CreditCardInput } from '@supercat1337/credit-card-input';
 
 /**
  * @typedef {'neutral' | 'valid' | 'invalid'} Status
@@ -79,6 +79,7 @@ const creditCard = new CreditCardInput({
     cardInput: /** @type {HTMLInputElement} */ (document.getElementById('cardNumber')),
     expiryInput: /** @type {HTMLInputElement} */ (document.getElementById('expiryDate')),
     cvvInput: /** @type {HTMLInputElement} */ (document.getElementById('cvv')),
+    ignoreCvvLength: true,
 });
 
 // Subscribe to events and update UI

@@ -3,11 +3,11 @@
 const ORIGINAL = Symbol('original');
 
 /**
- * @template {string | Record<string, any[]>} [Events=string]
+ * @template {string | symbol | Record<string|symbol, any[]>} [Events=string]
  */
 class EventEmitterLite {
     /**
-     * @type {Object.<Events extends string ? Events : keyof Events, Function[]>}
+     * @type {Object.<Events extends string | symbol ? Events : keyof Events, Function[]>}
      */
     events = Object.create(null);
 
@@ -19,7 +19,7 @@ class EventEmitterLite {
 
     /**
      * on is used to add a callback function that's going to be executed when the event is triggered
-     * @template {Events extends string ? Events : keyof Events} K
+     * @template {Events extends string | symbol ? Events : keyof Events} K
      * @param {K} event
      * @param {Function} listener
      * @returns {() => void}
@@ -34,7 +34,7 @@ class EventEmitterLite {
 
     /**
      * Add a one-time listener
-     * @template {Events extends string ? Events : keyof Events} K
+     * @template {Events extends string | symbol ? Events : keyof Events} K
      * @param {K} event
      * @param {Function} listener
      * @returns {()=>void}
@@ -50,7 +50,7 @@ class EventEmitterLite {
 
     /**
      * off is an alias for removeListener
-     * @template {Events extends string ? Events : keyof Events} K
+     * @template {Events extends string | symbol ? Events : keyof Events} K
      * @param {K} event
      * @param {Function} listener
      */
@@ -60,7 +60,7 @@ class EventEmitterLite {
 
     /**
      * Remove an event listener from an event
-     * @template {Events extends string ? Events : keyof Events} K
+     * @template {Events extends string | symbol ? Events : keyof Events} K
      * @param {K} event
      * @param {Function} listener
      */
@@ -80,7 +80,7 @@ class EventEmitterLite {
 
     /**
      * emit is used to trigger an event
-     * @template {Events extends string ? Events : keyof Events} K
+     * @template {Events extends string | symbol ? Events : keyof Events} K
      * @param {K} event
      * @param {...any} args
      */
@@ -225,39 +225,77 @@ function formatCvv(input) {
 // ---- Format expiry as MM / YY ----
 
 /**
- * Format expiry date input: only allow MM / YY (4 digits)
- * @param {HTMLInputElement} input - The input element to be formatted
- * @returns {void}
+ * Formats an expiry date input field to MM / YY.
+ * - Only digits are allowed, maximum 4 digits.
+ * - Prevents entering "00" as month by collapsing multiple leading zeros into one.
+ * - If the entered month is greater than 12, it prepends a zero (e.g., "14" -> "014" -> "01 / 4").
+ * - Handles cursor position correctly, especially after auto-correction.
+ *
+ * @param {HTMLInputElement} input - The input element to format.
+ * @param {string} [dateSeparator=' / '] - Separator between month and year.
  */
-function formatExpiry(input) {
+function formatExpiry(input, dateSeparator = ' / ') {
+    // Save current cursor position and old value
     const cursorPos = input.selectionStart || 0;
     const oldValue = input.value;
 
+    // Extract only digits, limit to 4 characters
     let digits = oldValue.replace(/\D/g, '').substring(0, 4);
+    
+    // Count how many digits were before the cursor in the old value
     const digitsBeforeCursor = oldValue.slice(0, cursorPos).replace(/\D/g, '').length;
 
+    // --- Apply correction rules ---
+
+    // 1. Prevent "00" month: replace multiple leading zeros with a single zero
+    digits = digits.replace(/^0+/g, '0');
+
+    // 2. If the first two digits form a month > 12, prepend a zero and keep only 4 digits
+    const month = parseInt(digits.slice(0, 2), 10);
+    if (month > 12) {
+        digits = ('0' + digits).slice(0, 4);
+    }
+
+    // --- Format the digits ---
     let formatted = '';
     if (digits.length > 0) {
         if (digits.length <= 2) {
+            // Only month part is visible
             formatted = digits;
         } else {
-            formatted = digits.substring(0, 2) + ' / ' + digits.substring(2, 4);
+            // Insert separator between month and year
+            formatted = digits.substring(0, 2) + dateSeparator + digits.substring(2, 4);
         }
     }
 
+    // Update input value
     input.value = formatted;
 
-    let newCursorPos = 0;
-    let digitCount = 0;
-    while (newCursorPos < formatted.length && digitCount < digitsBeforeCursor) {
-        if (/\d/.test(formatted[newCursorPos])) {
-            digitCount++;
-        }
-        newCursorPos++;
-    }
-    if (digitCount < digitsBeforeCursor) {
+    // --- Restore cursor position ---
+    let newCursorPos;
+
+    // If cursor was at the end of the old value (typical when typing),
+    // set it to the end of the formatted string.
+    if (cursorPos === oldValue.length) {
         newCursorPos = formatted.length;
+    } else {
+        // Otherwise, compute new position based on digit count before cursor.
+        // This handles cases like deleting or inserting in the middle.
+        let digitCount = 0;
+        newCursorPos = 0;
+        while (newCursorPos < formatted.length && digitCount < digitsBeforeCursor) {
+            if (/\d/.test(formatted[newCursorPos])) {
+                digitCount++;
+            }
+            newCursorPos++;
+        }
+        // If we couldn't find all expected digits, put cursor at the end.
+        if (digitCount < digitsBeforeCursor) {
+            newCursorPos = formatted.length;
+        }
     }
+
+    // Set the cursor to the calculated position
     input.setSelectionRange(newCursorPos, newCursorPos);
 }
 
@@ -322,6 +360,11 @@ function formatCardNumber(input) {
 // @ts-check
 
 
+const initEvent = 'init';
+const cardStatusChangeEvent = Symbol(); //'cardStatusChange';
+const expiryStatusChangeEvent = Symbol(); //'expiryStatusChange';
+const cvvStatusChangeEvent = Symbol(); //'cvvStatusChange';
+const allValidEvent = Symbol(); // 'allValid';
 /**
  * @typedef {'neutral' | 'valid' | 'invalid'} Status
  */
@@ -361,6 +404,21 @@ function formatCardNumber(input) {
  */
 
 class CreditCardInput {
+    #formatCardNumber;
+    #formatExpiry;
+    #formatCvv;
+    #getCardType;
+    /** @type {Status} */
+    #cardStatus;
+    /** @type {Status} */
+    #expiryStatus;
+    /** @type {Status} */
+    #cvvStatus;
+    #cardType;
+    #isAmex;
+    #allValid;
+    #ignoreCvvLength;
+
     /**
      * @param {Object} options
      * @param {HTMLInputElement} options.cardInput - Card number input field
@@ -370,6 +428,7 @@ class CreditCardInput {
      * @param {function(HTMLInputElement): void} [options.formatExpiry] - Custom expiry formatter
      * @param {function(HTMLInputElement): void} [options.formatCvv] - Custom CVV formatter
      * @param {function(string): string} [options.getCardType] - Custom card type detector
+     * @param {boolean} [options.ignoreCvvLength] - Allow CVV with 3 or 4 digits
      */
     constructor({
         cardInput,
@@ -379,38 +438,41 @@ class CreditCardInput {
         formatExpiry: formatExpiry$1 = formatExpiry,
         formatCvv: formatCvv$1 = formatCvv,
         getCardType: getCardType$1 = getCardType,
+        ignoreCvvLength = false,
     }) {
         this.cardInput = cardInput;
         this.expiryInput = expiryInput;
         this.cvvInput = cvvInput;
 
         // Instance-specific formatters
-        this._formatCardNumber = formatCardNumber$1;
-        this._formatExpiry = formatExpiry$1;
-        this._formatCvv = formatCvv$1;
-        this._getCardType = getCardType$1;
+        this.#formatCardNumber = formatCardNumber$1;
+        this.#formatExpiry = formatExpiry$1;
+        this.#formatCvv = formatCvv$1;
+        this.#getCardType = getCardType$1;
 
+        /** @type {EventEmitterLite<string|symbol >} */
         this.eventEmitter = new EventEmitterLite();
 
         // Internal states
-        /** @type {Status} */ this._cardStatus = 'neutral';
-        /** @type {Status} */ this._expiryStatus = 'neutral';
-        /** @type {Status} */ this._cvvStatus = 'neutral';
-        /** @type {string} */ this._cardType = '';
-        /** @type {boolean} */ this._isAmex = false;
-        /** @type {boolean} */ this._allValid = false;
+        /** @type {Status} */ this.#cardStatus = 'neutral';
+        /** @type {Status} */ this.#expiryStatus = 'neutral';
+        /** @type {Status} */ this.#cvvStatus = 'neutral';
+        /** @type {string} */ this.#cardType = '';
+        /** @type {boolean} */ this.#isAmex = false;
+        /** @type {boolean} */ this.#allValid = false;
+        /** @type {boolean} */ this.#ignoreCvvLength = ignoreCvvLength;
     }
     // Public methods to trigger formatting (can also be called directly)
     formatCardNumber() {
-        this._formatCardNumber(this.cardInput);
+        this.#formatCardNumber(this.cardInput);
     }
 
     formatExpiry() {
-        this._formatExpiry(this.expiryInput);
+        this.#formatExpiry(this.expiryInput);
     }
 
     formatCvv() {
-        this._formatCvv(this.cvvInput);
+        this.#formatCvv(this.cvvInput);
     }
 
     /**
@@ -419,10 +481,19 @@ class CreditCardInput {
      * @returns {string} - Card type (Visa, Mastercard, etc.)
      */
     getCardType(digits) {
-        return this._getCardType(digits);
+        return this.#getCardType(digits);
     }
 
     // ---------- Public subscription methods ----------
+
+    /**
+     * Subscribe to initialization event.
+     * @param {function(CreditCardInput): void} callback - Callback to be called when CreditCardInput is initialized
+     * @returns {() => void} Unsubscribe function
+     */
+    onInit(callback) {
+        return this.eventEmitter.on('init', callback);
+    }
 
     /**
      * Subscribe to card number status change event.
@@ -430,7 +501,7 @@ class CreditCardInput {
      * @returns {() => void} Unsubscribe function
      */
     onCardStatus(callback) {
-        return this.eventEmitter.on('cardStatusChange', callback);
+        return this.eventEmitter.on(cardStatusChangeEvent, callback);
     }
 
     /**
@@ -439,7 +510,7 @@ class CreditCardInput {
      * @returns {() => void}
      */
     onExpiryStatus(callback) {
-        return this.eventEmitter.on('expiryStatusChange', callback);
+        return this.eventEmitter.on(expiryStatusChangeEvent, callback);
     }
 
     /**
@@ -448,7 +519,7 @@ class CreditCardInput {
      * @returns {() => void}
      */
     onCvvStatus(callback) {
-        return this.eventEmitter.on('cvvStatusChange', callback);
+        return this.eventEmitter.on(cvvStatusChangeEvent, callback);
     }
 
     /**
@@ -457,7 +528,7 @@ class CreditCardInput {
      * @returns {() => void}
      */
     onAllValid(callback) {
-        return this.eventEmitter.on('allValid', callback);
+        return this.eventEmitter.on(allValidEvent, callback);
     }
 
     /**
@@ -483,12 +554,12 @@ class CreditCardInput {
      */
     getState() {
         return {
-            cardStatus: this._cardStatus,
-            expiryStatus: this._expiryStatus,
-            cvvStatus: this._cvvStatus,
-            cardType: this._cardType,
-            isAmex: this._isAmex,
-            allValid: this._allValid,
+            cardStatus: this.#cardStatus,
+            expiryStatus: this.#expiryStatus,
+            cvvStatus: this.#cvvStatus,
+            cardType: this.#cardType,
+            isAmex: this.#isAmex,
+            allValid: this.#allValid,
         };
     }
 
@@ -500,48 +571,48 @@ class CreditCardInput {
         // Input event handlers
         this.cardInput.addEventListener('input', () => {
             this.formatCardNumber();
-            this._updateCardStatus();
-            this._updateCvvStatus(); // CVV depends on card type
+            this.#updateCardStatus();
+            this.#updateCvvStatus(); // CVV depends on card type
         });
 
         this.expiryInput.addEventListener('input', () => {
             this.formatExpiry();
-            this._updateExpiryStatus();
+            this.#updateExpiryStatus();
         });
 
         this.cvvInput.addEventListener('input', () => {
             this.formatCvv();
-            this._updateCvvStatus();
+            this.#updateCvvStatus();
         });
 
         // Initial update
-        this._updateCardStatus();
-        this._updateExpiryStatus();
-        this._updateCvvStatus();
+        this.#updateCardStatus();
+        this.#updateExpiryStatus();
+        this.#updateCvvStatus();
 
-        this.emit('init');
+        this.#emit(initEvent);
     }
 
     /**
      * Emit event (internal use).
-     * @param {string} event
+     * @param {string|symbol} event
      * @param {...any} args
      */
-    emit(event, ...args) {
+    #emit(event, ...args) {
         this.eventEmitter.emit(event, ...args, this);
     }
 
     // ---------- Private methods ----------
 
-    _updateCardStatus() {
+    #updateCardStatus() {
         const value = this.cardInput.value;
         const digits = value.replace(/\D/g, '');
         const isAmex = isProbablyAmex(digits);
         const maxDigits = isAmex ? 15 : 16;
         const type = this.getCardType(digits);
 
-        this._cardType = type;
-        this._isAmex = isAmex;
+        this.#cardType = type;
+        this.#isAmex = isAmex;
 
         /** @type {Status} */
         let status = 'neutral';
@@ -553,8 +624,8 @@ class CreditCardInput {
         }
 
         // Always emit event, as other fields (type, isAmex) may change
-        this._cardStatus = status;
-        this.emit('cardStatusChange', {
+        this.#cardStatus = status;
+        this.#emit(cardStatusChangeEvent, {
             status,
             value,
             digits,
@@ -564,10 +635,10 @@ class CreditCardInput {
             maxDigits,
         });
 
-        this._checkAllValid();
+        this.#checkAllValid();
     }
 
-    _updateExpiryStatus() {
+    #updateExpiryStatus() {
         const value = this.expiryInput.value;
         const digits = value.replace(/\D/g, '');
         /** @type {Status} */
@@ -598,8 +669,8 @@ class CreditCardInput {
             }
         }
 
-        this._expiryStatus = status;
-        this.emit('expiryStatusChange', {
+        this.#expiryStatus = status;
+        this.#emit(expiryStatusChangeEvent, {
             status,
             value,
             digits,
@@ -607,24 +678,28 @@ class CreditCardInput {
             year,
         });
 
-        this._checkAllValid();
+        this.#checkAllValid();
     }
 
-    _updateCvvStatus() {
+    #updateCvvStatus() {
         const value = this.cvvInput.value;
         const digits = value.replace(/\D/g, '');
-        const isAmex = this._isAmex;
+        const isAmex = this.#isAmex;
         const expectedLength = isAmex ? 4 : 3;
 
         /** @type {Status} */
         let status = 'neutral';
 
         if (digits.length > 0) {
-            status = digits.length === expectedLength ? 'valid' : 'invalid';
+            if (this.#ignoreCvvLength) {
+                status = digits.length === 3 || digits.length === 4 ? 'valid' : 'invalid';
+            } else {
+                status = digits.length === expectedLength ? 'valid' : 'invalid';
+            }
         }
 
-        this._cvvStatus = status;
-        this.emit('cvvStatusChange', {
+        this.#cvvStatus = status;
+        this.#emit(cvvStatusChangeEvent, {
             status,
             value,
             digits,
@@ -632,20 +707,21 @@ class CreditCardInput {
             isAmex,
         });
 
-        this._checkAllValid();
+        this.#checkAllValid();
     }
 
     /**
      * Checks if all fields are valid and emits allValid event on change.
      */
-    _checkAllValid() {
+    #checkAllValid() {
         const allValidNow =
-            this._cardStatus === 'valid' &&
-            this._expiryStatus === 'valid' &&
-            this._cvvStatus === 'valid';
-        if (this._allValid !== allValidNow) {
-            this._allValid = allValidNow;
-            this.emit('allValid', { isAllValid: allValidNow });
+            this.#cardStatus === 'valid' &&
+            this.#expiryStatus === 'valid' &&
+            this.#cvvStatus === 'valid';
+
+        if (allValidNow && this.#allValid !== allValidNow) {
+            this.#allValid = allValidNow;
+            this.#emit(allValidEvent, { isAllValid: allValidNow });
         }
     }
 }

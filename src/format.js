@@ -1,6 +1,6 @@
 // @ts-check
 
-import { isProbablyAmex } from "./helpers.js";
+import { isProbablyAmex } from './helpers.js';
 
 // ---- Format CVV: only digits ----
 
@@ -26,39 +26,77 @@ export function formatCvv(input) {
 // ---- Format expiry as MM / YY ----
 
 /**
- * Format expiry date input: only allow MM / YY (4 digits)
- * @param {HTMLInputElement} input - The input element to be formatted
- * @returns {void}
+ * Formats an expiry date input field to MM / YY.
+ * - Only digits are allowed, maximum 4 digits.
+ * - Prevents entering "00" as month by collapsing multiple leading zeros into one.
+ * - If the entered month is greater than 12, it prepends a zero (e.g., "14" -> "014" -> "01 / 4").
+ * - Handles cursor position correctly, especially after auto-correction.
+ *
+ * @param {HTMLInputElement} input - The input element to format.
+ * @param {string} [dateSeparator=' / '] - Separator between month and year.
  */
-export function formatExpiry(input) {
+export function formatExpiry(input, dateSeparator = ' / ') {
+    // Save current cursor position and old value
     const cursorPos = input.selectionStart || 0;
     const oldValue = input.value;
 
+    // Extract only digits, limit to 4 characters
     let digits = oldValue.replace(/\D/g, '').substring(0, 4);
+    
+    // Count how many digits were before the cursor in the old value
     const digitsBeforeCursor = oldValue.slice(0, cursorPos).replace(/\D/g, '').length;
 
+    // --- Apply correction rules ---
+
+    // 1. Prevent "00" month: replace multiple leading zeros with a single zero
+    digits = digits.replace(/^0+/g, '0');
+
+    // 2. If the first two digits form a month > 12, prepend a zero and keep only 4 digits
+    const month = parseInt(digits.slice(0, 2), 10);
+    if (month > 12) {
+        digits = ('0' + digits).slice(0, 4);
+    }
+
+    // --- Format the digits ---
     let formatted = '';
     if (digits.length > 0) {
         if (digits.length <= 2) {
+            // Only month part is visible
             formatted = digits;
         } else {
-            formatted = digits.substring(0, 2) + ' / ' + digits.substring(2, 4);
+            // Insert separator between month and year
+            formatted = digits.substring(0, 2) + dateSeparator + digits.substring(2, 4);
         }
     }
 
+    // Update input value
     input.value = formatted;
 
-    let newCursorPos = 0;
-    let digitCount = 0;
-    while (newCursorPos < formatted.length && digitCount < digitsBeforeCursor) {
-        if (/\d/.test(formatted[newCursorPos])) {
-            digitCount++;
-        }
-        newCursorPos++;
-    }
-    if (digitCount < digitsBeforeCursor) {
+    // --- Restore cursor position ---
+    let newCursorPos;
+
+    // If cursor was at the end of the old value (typical when typing),
+    // set it to the end of the formatted string.
+    if (cursorPos === oldValue.length) {
         newCursorPos = formatted.length;
+    } else {
+        // Otherwise, compute new position based on digit count before cursor.
+        // This handles cases like deleting or inserting in the middle.
+        let digitCount = 0;
+        newCursorPos = 0;
+        while (newCursorPos < formatted.length && digitCount < digitsBeforeCursor) {
+            if (/\d/.test(formatted[newCursorPos])) {
+                digitCount++;
+            }
+            newCursorPos++;
+        }
+        // If we couldn't find all expected digits, put cursor at the end.
+        if (digitCount < digitsBeforeCursor) {
+            newCursorPos = formatted.length;
+        }
     }
+
+    // Set the cursor to the calculated position
     input.setSelectionRange(newCursorPos, newCursorPos);
 }
 

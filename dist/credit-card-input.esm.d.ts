@@ -122,8 +122,9 @@ export class CreditCardInput {
      * @param {function(HTMLInputElement): void} [options.formatExpiry] - Custom expiry formatter
      * @param {function(HTMLInputElement): void} [options.formatCvv] - Custom CVV formatter
      * @param {function(string): string} [options.getCardType] - Custom card type detector
+     * @param {boolean} [options.ignoreCvvLength] - Allow CVV with 3 or 4 digits
      */
-    constructor({ cardInput, expiryInput, cvvInput, formatCardNumber: formatCardNumber$1, formatExpiry: formatExpiry$1, formatCvv: formatCvv$1, getCardType: getCardType$1, }: {
+    constructor({ cardInput, expiryInput, cvvInput, formatCardNumber: formatCardNumber$1, formatExpiry: formatExpiry$1, formatCvv: formatCvv$1, getCardType: getCardType$1, ignoreCvvLength, }: {
         cardInput: HTMLInputElement;
         expiryInput: HTMLInputElement;
         cvvInput: HTMLInputElement;
@@ -131,21 +132,13 @@ export class CreditCardInput {
         formatExpiry?: (arg0: HTMLInputElement) => void;
         formatCvv?: (arg0: HTMLInputElement) => void;
         getCardType?: (arg0: string) => string;
+        ignoreCvvLength?: boolean;
     });
     cardInput: HTMLInputElement;
     expiryInput: HTMLInputElement;
     cvvInput: HTMLInputElement;
-    _formatCardNumber: (arg0: HTMLInputElement) => void;
-    _formatExpiry: (arg0: HTMLInputElement) => void;
-    _formatCvv: (arg0: HTMLInputElement) => void;
-    _getCardType: (arg0: string) => string;
-    eventEmitter: EventEmitterLite<string>;
-    /** @type {Status} */ _cardStatus: Status;
-    /** @type {Status} */ _expiryStatus: Status;
-    /** @type {Status} */ _cvvStatus: Status;
-    /** @type {string} */ _cardType: string;
-    /** @type {boolean} */ _isAmex: boolean;
-    /** @type {boolean} */ _allValid: boolean;
+    /** @type {EventEmitterLite<string|symbol >} */
+    eventEmitter: EventEmitterLite<string | symbol>;
     formatCardNumber(): void;
     formatExpiry(): void;
     formatCvv(): void;
@@ -155,6 +148,12 @@ export class CreditCardInput {
      * @returns {string} - Card type (Visa, Mastercard, etc.)
      */
     getCardType(digits: string): string;
+    /**
+     * Subscribe to initialization event.
+     * @param {function(CreditCardInput): void} callback - Callback to be called when CreditCardInput is initialized
+     * @returns {() => void} Unsubscribe function
+     */
+    onInit(callback: (arg0: CreditCardInput) => void): () => void;
     /**
      * Subscribe to card number status change event.
      * @param {function(CardStatusEvent, CreditCardInput): void} callback
@@ -210,19 +209,7 @@ export class CreditCardInput {
      * Call after setting up subscriptions.
      */
     init(): void;
-    /**
-     * Emit event (internal use).
-     * @param {string} event
-     * @param {...any} args
-     */
-    emit(event: string, ...args: any[]): void;
-    _updateCardStatus(): void;
-    _updateExpiryStatus(): void;
-    _updateCvvStatus(): void;
-    /**
-     * Checks if all fields are valid and emits allValid event on change.
-     */
-    _checkAllValid(): void;
+    #private;
 }
 /**
  * Format card number input: dynamic grouping based on card type
@@ -237,11 +224,16 @@ export function formatCardNumber(input: HTMLInputElement): void;
  */
 export function formatCvv(input: HTMLInputElement): void;
 /**
- * Format expiry date input: only allow MM / YY (4 digits)
- * @param {HTMLInputElement} input - The input element to be formatted
- * @returns {void}
+ * Formats an expiry date input field to MM / YY.
+ * - Only digits are allowed, maximum 4 digits.
+ * - Prevents entering "00" as month by collapsing multiple leading zeros into one.
+ * - If the entered month is greater than 12, it prepends a zero (e.g., "14" -> "014" -> "01 / 4").
+ * - Handles cursor position correctly, especially after auto-correction.
+ *
+ * @param {HTMLInputElement} input - The input element to format.
+ * @param {string} [dateSeparator=' / '] - Separator between month and year.
  */
-export function formatExpiry(input: HTMLInputElement): void;
+export function formatExpiry(input: HTMLInputElement, dateSeparator?: string): void;
 /**
  * Detects the type of a credit card based on its number
  * @param {string} digits The credit card number as a string of digits
