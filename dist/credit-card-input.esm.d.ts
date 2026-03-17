@@ -122,9 +122,10 @@ export class CreditCardInput {
      * @param {function(HTMLInputElement): void} [options.formatExpiry] - Custom expiry formatter
      * @param {function(HTMLInputElement): void} [options.formatCvv] - Custom CVV formatter
      * @param {function(string): string} [options.getCardType] - Custom card type detector
-     * @param {boolean} [options.ignoreCvvLength] - Allow CVV with 3 or 4 digits
+     * @param {boolean} [options.ignoreCvvLength] -  Allow CVV with 3 or 4 digits for any card.
+     * @param {number} [options.expiryMaxYears = 10] - Maximum number of years a card can be valid from the current year
      */
-    constructor({ cardInput, expiryInput, cvvInput, formatCardNumber: formatCardNumber$1, formatExpiry: formatExpiry$1, formatCvv: formatCvv$1, getCardType: getCardType$1, ignoreCvvLength, }: {
+    constructor({ cardInput, expiryInput, cvvInput, formatCardNumber: formatCardNumber$1, formatExpiry: formatExpiry$1, formatCvv: formatCvv$1, getCardType: getCardType$1, ignoreCvvLength, expiryMaxYears, }: {
         cardInput: HTMLInputElement;
         expiryInput: HTMLInputElement;
         cvvInput: HTMLInputElement;
@@ -133,10 +134,12 @@ export class CreditCardInput {
         formatCvv?: (arg0: HTMLInputElement) => void;
         getCardType?: (arg0: string) => string;
         ignoreCvvLength?: boolean;
+        expiryMaxYears?: number;
     });
     cardInput: HTMLInputElement;
     expiryInput: HTMLInputElement;
     cvvInput: HTMLInputElement;
+    expiryMaxYears: number;
     /** @type {EventEmitterLite<string|symbol >} */
     eventEmitter: EventEmitterLite<string | symbol>;
     formatCardNumber(): void;

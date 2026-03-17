@@ -76,7 +76,8 @@ export class CreditCardInput {
      * @param {function(HTMLInputElement): void} [options.formatExpiry] - Custom expiry formatter
      * @param {function(HTMLInputElement): void} [options.formatCvv] - Custom CVV formatter
      * @param {function(string): string} [options.getCardType] - Custom card type detector
-     * @param {boolean} [options.ignoreCvvLength] - Allow CVV with 3 or 4 digits
+     * @param {boolean} [options.ignoreCvvLength] -  Allow CVV with 3 or 4 digits for any card.
+     * @param {number} [options.expiryMaxYears = 10] - Maximum number of years a card can be valid from the current year
      */
     constructor({
         cardInput,
@@ -87,6 +88,7 @@ export class CreditCardInput {
         formatCvv = defaultFormatCvv,
         getCardType = defaultGetCardType,
         ignoreCvvLength = false,
+        expiryMaxYears = 10,
     }) {
         this.cardInput = cardInput;
         this.expiryInput = expiryInput;
@@ -97,6 +99,8 @@ export class CreditCardInput {
         this.#formatExpiry = formatExpiry;
         this.#formatCvv = formatCvv;
         this.#getCardType = getCardType;
+
+        this.expiryMaxYears = expiryMaxYears;
 
         /** @type {EventEmitterLite<string|symbol >} */
         this.eventEmitter = new EventEmitterLite();
@@ -307,7 +311,7 @@ export class CreditCardInput {
 
                 const currentTotal = currentYear * 12 + currentMonth;
                 const inputTotal = year * 12 + month;
-                const maxTotal = (currentYear + 10) * 12 + currentMonth;
+                const maxTotal = (currentYear + this.expiryMaxYears) * 12 + currentMonth;
 
                 if (inputTotal < currentTotal || inputTotal > maxTotal) {
                     status = 'invalid';
