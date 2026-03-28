@@ -189,14 +189,134 @@ export class CreditCardInput {
      */
     on(eventName: string, callback: (...args: any[]) => void): () => void;
     /**
-     * Get current state.
+     * Initialize event handlers.
+     * Call after setting up subscriptions.
+     */
+    init(): void;
+    /**
+     * Returns detailed validation result for the card number field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_luhn',
+     *   message?: string
+     * }}
+     */
+    getCardValidationResult(): {
+        status: "valid" | "invalid" | "empty" | "incomplete";
+        code: "valid" | "empty" | "incomplete" | "invalid_luhn";
+        message?: string;
+    };
+    /**
+     * Returns detailed validation result for the expiry date field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_month' | 'expired' | 'future_too_far',
+     *   message?: string
+     * }}
+     */
+    getExpiryValidationResult(): {
+        status: "valid" | "invalid" | "empty" | "incomplete";
+        code: "valid" | "empty" | "incomplete" | "invalid_month" | "expired" | "future_too_far";
+        message?: string;
+    };
+    /**
+     * Returns detailed validation result for the CVV field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_length',
+     *   message?: string
+     * }}
+     */
+    getCvvValidationResult(): {
+        status: "valid" | "invalid" | "empty" | "incomplete";
+        code: "valid" | "empty" | "incomplete" | "invalid_length";
+        message?: string;
+    };
+    /**
+     * Returns validation results for all three fields.
+     * @returns {{
+     *   card: ReturnType<CreditCardInput['getCardValidationResult']>,
+     *   expiry: ReturnType<CreditCardInput['getExpiryValidationResult']>,
+     *   cvv: ReturnType<CreditCardInput['getCvvValidationResult']>,
+     *   isAllValid: boolean
+     * }}
+     */
+    getValidationResults(): {
+        card: ReturnType<CreditCardInput["getCardValidationResult"]>;
+        expiry: ReturnType<CreditCardInput["getExpiryValidationResult"]>;
+        cvv: ReturnType<CreditCardInput["getCvvValidationResult"]>;
+        isAllValid: boolean;
+    };
+    /**
+     * Returns current card data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   type: string,
+     *   isAmex: boolean,
+     *   maxDigits: number,
+     *   isValid: boolean,
+     *   isComplete: boolean
+     * }}
+     */
+    getCardData(): {
+        value: string;
+        digits: string;
+        type: string;
+        isAmex: boolean;
+        maxDigits: number;
+        isValid: boolean;
+        isComplete: boolean;
+    };
+    /**
+     * Returns current expiry data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   month: number | null,
+     *   year: number | null,
+     *   isValid: boolean
+     * }}
+     */
+    getExpiryData(): {
+        value: string;
+        digits: string;
+        month: number | null;
+        year: number | null;
+        isValid: boolean;
+    };
+    /**
+     * Returns current CVV data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   expectedLength: number,
+     *   isAmex: boolean,
+     *   isValid: boolean
+     * }}
+     */
+    getCvvData(): {
+        value: string;
+        digits: string;
+        expectedLength: number;
+        isAmex: boolean;
+        isValid: boolean;
+    };
+    /**
+     * Returns the full state of the component, including validation details and raw data.
      * @returns {{
      *   cardStatus: Status,
      *   expiryStatus: Status,
      *   cvvStatus: Status,
      *   cardType: string,
      *   isAmex: boolean,
-     *   allValid: boolean
+     *   allValid: boolean,
+     *   cardValidation: ReturnType<CreditCardInput['getCardValidationResult']>,
+     *   expiryValidation: ReturnType<CreditCardInput['getExpiryValidationResult']>,
+     *   cvvValidation: ReturnType<CreditCardInput['getCvvValidationResult']>,
+     *   cardData: ReturnType<CreditCardInput['getCardData']>,
+     *   expiryData: ReturnType<CreditCardInput['getExpiryData']>,
+     *   cvvData: ReturnType<CreditCardInput['getCvvData']>
      * }}
      */
     getState(): {
@@ -206,12 +326,13 @@ export class CreditCardInput {
         cardType: string;
         isAmex: boolean;
         allValid: boolean;
+        cardValidation: ReturnType<CreditCardInput["getCardValidationResult"]>;
+        expiryValidation: ReturnType<CreditCardInput["getExpiryValidationResult"]>;
+        cvvValidation: ReturnType<CreditCardInput["getCvvValidationResult"]>;
+        cardData: ReturnType<CreditCardInput["getCardData"]>;
+        expiryData: ReturnType<CreditCardInput["getExpiryData"]>;
+        cvvData: ReturnType<CreditCardInput["getCvvData"]>;
     };
-    /**
-     * Initialize event handlers.
-     * Call after setting up subscriptions.
-     */
-    init(): void;
     #private;
 }
 /**

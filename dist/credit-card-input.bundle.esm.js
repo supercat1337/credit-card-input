@@ -546,28 +546,6 @@ class CreditCardInput {
     }
 
     /**
-     * Get current state.
-     * @returns {{
-     *   cardStatus: Status,
-     *   expiryStatus: Status,
-     *   cvvStatus: Status,
-     *   cardType: string,
-     *   isAmex: boolean,
-     *   allValid: boolean
-     * }}
-     */
-    getState() {
-        return {
-            cardStatus: this.#cardStatus,
-            expiryStatus: this.#expiryStatus,
-            cvvStatus: this.#cvvStatus,
-            cardType: this.#cardType,
-            isAmex: this.#isAmex,
-            allValid: this.#allValid,
-        };
-    }
-
-    /**
      * Initialize event handlers.
      * Call after setting up subscriptions.
      */
@@ -727,6 +705,323 @@ class CreditCardInput {
             this.#allValid = allValidNow;
             this.#emit(allValidEvent, { isAllValid: allValidNow });
         }
+    }
+
+    /**
+     * Returns detailed validation result for the card number field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_luhn',
+     *   message?: string
+     * }}
+     */
+    getCardValidationResult() {
+        const value = this.cardInput.value;
+        const digits = value.replace(/\D/g, '');
+        const isAmex = isProbablyAmex(digits);
+        const maxDigits = isAmex ? 15 : 16;
+
+        if (digits.length === 0) {
+            return {
+                status: 'empty',
+                code: 'empty',
+                message: 'Card number is empty',
+            };
+        }
+        if (digits.length < maxDigits) {
+            return {
+                status: 'incomplete',
+                code: 'incomplete',
+                message: `Card number must contain ${maxDigits} digits`,
+            };
+        }
+        const isValid = luhnValidate(digits);
+        if (!isValid) {
+            return {
+                status: 'invalid',
+                code: 'invalid_luhn',
+                message: 'Card number is invalid (Luhn check failed)',
+            };
+        }
+        return {
+            status: 'valid',
+            code: 'valid',
+        };
+    }
+
+    /**
+     * Returns detailed validation result for the expiry date field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_month' | 'expired' | 'future_too_far',
+     *   message?: string
+     * }}
+     */
+    getExpiryValidationResult() {
+        const value = this.expiryInput.value;
+        const digits = value.replace(/\D/g, '');
+
+        if (digits.length === 0) {
+            return {
+                status: 'empty',
+                code: 'empty',
+                message: 'Expiry date is empty',
+            };
+        }
+        if (digits.length < 4) {
+            return {
+                status: 'incomplete',
+                code: 'incomplete',
+                message: 'Expiry date must be in MMYY format',
+            };
+        }
+
+        const month = parseInt(digits.substring(0, 2), 10);
+        const year = parseInt(digits.substring(2, 4), 10) + 2000;
+
+        if (month < 1 || month > 12) {
+            return {
+                status: 'invalid',
+                code: 'invalid_month',
+                message: 'Month must be between 1 and 12',
+            };
+        }
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1;
+        const currentTotal = currentYear * 12 + currentMonth;
+        const inputTotal = year * 12 + month;
+        const maxTotal = (currentYear + this.expiryMaxYears) * 12 + currentMonth;
+
+        if (inputTotal < currentTotal) {
+            return {
+                status: 'invalid',
+                code: 'expired',
+                message: 'Card has expired',
+            };
+        }
+        if (inputTotal > maxTotal) {
+            return {
+                status: 'invalid',
+                code: 'future_too_far',
+                message: `Expiry date is too far in the future (max ${this.expiryMaxYears} years)`,
+            };
+        }
+
+        return {
+            status: 'valid',
+            code: 'valid',
+        };
+    }
+
+    /**
+     * Returns detailed validation result for the CVV field.
+     * @returns {{
+     *   status: 'valid' | 'invalid' | 'empty' | 'incomplete',
+     *   code: 'valid' | 'empty' | 'incomplete' | 'invalid_length',
+     *   message?: string
+     * }}
+     */
+    getCvvValidationResult() {
+        const value = this.cvvInput.value;
+        const digits = value.replace(/\D/g, '');
+        const isAmex = this.#isAmex;
+        const expectedLength = isAmex ? 4 : 3;
+
+        if (digits.length === 0) {
+            return {
+                status: 'empty',
+                code: 'empty',
+                message: 'CVV is empty',
+            };
+        }
+
+        if (this.#ignoreCvvLength) {
+            if (digits.length === 3 || digits.length === 4) {
+                return {
+                    status: 'valid',
+                    code: 'valid',
+                };
+            }
+            if (digits.length < 3) {
+                return {
+                    status: 'incomplete',
+                    code: 'incomplete',
+                    message: 'CVV must be 3 or 4 digits',
+                };
+            }
+            // digits.length > 4 cannot happen due to maxlength, but just in case:
+            return {
+                status: 'invalid',
+                code: 'invalid_length',
+                message: 'CVV must be 3 or 4 digits',
+            };
+        } else {
+            if (digits.length === expectedLength) {
+                return {
+                    status: 'valid',
+                    code: 'valid',
+                };
+            }
+            if (digits.length < expectedLength) {
+                return {
+                    status: 'incomplete',
+                    code: 'incomplete',
+                    message: `CVV must be ${expectedLength} digits`,
+                };
+            }
+            return {
+                status: 'invalid',
+                code: 'invalid_length',
+                message: `CVV must be ${expectedLength} digits`,
+            };
+        }
+    }
+
+    /**
+     * Returns validation results for all three fields.
+     * @returns {{
+     *   card: ReturnType<CreditCardInput['getCardValidationResult']>,
+     *   expiry: ReturnType<CreditCardInput['getExpiryValidationResult']>,
+     *   cvv: ReturnType<CreditCardInput['getCvvValidationResult']>,
+     *   isAllValid: boolean
+     * }}
+     */
+    getValidationResults() {
+        const card = this.getCardValidationResult();
+        const expiry = this.getExpiryValidationResult();
+        const cvv = this.getCvvValidationResult();
+        return {
+            card,
+            expiry,
+            cvv,
+            isAllValid:
+                card.status === 'valid' && expiry.status === 'valid' && cvv.status === 'valid',
+        };
+    }
+
+    /**
+     * Returns current card data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   type: string,
+     *   isAmex: boolean,
+     *   maxDigits: number,
+     *   isValid: boolean,
+     *   isComplete: boolean
+     * }}
+     */
+    getCardData() {
+        const value = this.cardInput.value;
+        const digits = value.replace(/\D/g, '');
+        const isAmex = isProbablyAmex(digits);
+        const maxDigits = isAmex ? 15 : 16;
+        const type = this.getCardType(digits);
+        const isValid = digits.length >= maxDigits && luhnValidate(digits);
+        return {
+            value,
+            digits,
+            type,
+            isAmex,
+            maxDigits,
+            isValid,
+            isComplete: digits.length === maxDigits,
+        };
+    }
+
+    /**
+     * Returns current expiry data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   month: number | null,
+     *   year: number | null,
+     *   isValid: boolean
+     * }}
+     */
+    getExpiryData() {
+        const value = this.expiryInput.value;
+        const digits = value.replace(/\D/g, '');
+        let month = null,
+            year = null,
+            isValid = false;
+        if (digits.length === 4) {
+            month = parseInt(digits.substring(0, 2), 10);
+            year = parseInt(digits.substring(2, 4), 10) + 2000;
+            // validation similar to #updateExpiryStatus
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            const currentTotal = currentYear * 12 + currentMonth;
+            const inputTotal = year * 12 + month;
+            const maxTotal = (currentYear + this.expiryMaxYears) * 12 + currentMonth;
+            isValid =
+                month >= 1 && month <= 12 && inputTotal >= currentTotal && inputTotal <= maxTotal;
+        }
+        return { value, digits, month, year, isValid };
+    }
+
+    /**
+     * Returns current CVV data.
+     * @returns {{
+     *   value: string,
+     *   digits: string,
+     *   expectedLength: number,
+     *   isAmex: boolean,
+     *   isValid: boolean
+     * }}
+     */
+    getCvvData() {
+        const value = this.cvvInput.value;
+        const digits = value.replace(/\D/g, '');
+        const isAmex = this.#isAmex;
+        const expectedLength = isAmex ? 4 : 3;
+        let isValid = false;
+        if (this.#ignoreCvvLength) {
+            isValid = digits.length === 3 || digits.length === 4;
+        } else {
+            isValid = digits.length === expectedLength;
+        }
+        return { value, digits, expectedLength, isAmex, isValid };
+    }
+
+    /**
+     * Returns the full state of the component, including validation details and raw data.
+     * @returns {{
+     *   cardStatus: Status,
+     *   expiryStatus: Status,
+     *   cvvStatus: Status,
+     *   cardType: string,
+     *   isAmex: boolean,
+     *   allValid: boolean,
+     *   cardValidation: ReturnType<CreditCardInput['getCardValidationResult']>,
+     *   expiryValidation: ReturnType<CreditCardInput['getExpiryValidationResult']>,
+     *   cvvValidation: ReturnType<CreditCardInput['getCvvValidationResult']>,
+     *   cardData: ReturnType<CreditCardInput['getCardData']>,
+     *   expiryData: ReturnType<CreditCardInput['getExpiryData']>,
+     *   cvvData: ReturnType<CreditCardInput['getCvvData']>
+     * }}
+     */
+    getState() {
+        const base = {
+            cardStatus: this.#cardStatus,
+            expiryStatus: this.#expiryStatus,
+            cvvStatus: this.#cvvStatus,
+            cardType: this.#cardType,
+            isAmex: this.#isAmex,
+            allValid: this.#allValid,
+        };
+        return {
+            ...base,
+            cardValidation: this.getCardValidationResult(),
+            expiryValidation: this.getExpiryValidationResult(),
+            cvvValidation: this.getCvvValidationResult(),
+            cardData: this.getCardData(),
+            expiryData: this.getExpiryData(),
+            cvvData: this.getCvvData(),
+        };
     }
 }
 
