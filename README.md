@@ -152,34 +152,45 @@ new CreditCardInput({
   formatExpiry?: (input: HTMLInputElement) => void;
   formatCvv?: (input: HTMLInputElement) => void;
   getCardType?: (digits: string) => string;
+  ignoreCvvLength?: boolean;
+  expiryMaxYears?: number;
 })
 ```
 
-| Parameter                     | Description                                                                |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| `cardInput`                   | Input element for card number                                              |
-| `expiryInput`                 | Input element for expiry date                                              |
-| `cvvInput`                    | Input element for CVV                                                      |
-| `formatCardNumber` (optional) | Custom card number formatter. Default uses `formatCardNumber` from library |
-| `formatExpiry` (optional)     | Custom expiry formatter. Default uses `formatExpiry`                       |
-| `formatCvv` (optional)        | Custom CVV formatter. Default uses `formatCvv`                             |
-| `getCardType` (optional)      | Custom card type detector. Default uses `getCardType`                      |
+| Parameter                     | Description                                                                                     |
+| ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `cardInput`                   | Input element for card number                                                                   |
+| `expiryInput`                 | Input element for expiry date                                                                   |
+| `cvvInput`                    | Input element for CVV                                                                           |
+| `formatCardNumber` (optional) | Custom card number formatter. Default uses `formatCardNumber` from library                      |
+| `formatExpiry` (optional)     | Custom expiry formatter. Default uses `formatExpiry`                                            |
+| `formatCvv` (optional)        | Custom CVV formatter. Default uses `formatCvv`                                                  |
+| `getCardType` (optional)      | Custom card type detector. Default uses `getCardType`                                           |
+| `ignoreCvvLength` (optional)  | If `true`, CVV is considered valid with 3 or 4 digits regardless of card type. Default `false`. |
+| `expiryMaxYears` (optional)   | Maximum number of years a card can be valid from the current year. Default `10`.                |
 
 #### Instance Methods
 
-| Method                                                                   | Description                                                            |
-| ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `formatCardNumber()`                                                     | Triggers formatting on the card input using the current formatter.     |
-| `formatExpiry()`                                                         | Triggers formatting on the expiry input.                               |
-| `formatCvv()`                                                            | Triggers formatting on the CVV input.                                  |
-| `getCardType(digits: string): string`                                    | Returns card type for the given digits using the current detector.     |
-| `onCardStatus(callback: (event: CardStatusEvent, instance) => void)`     | Subscribe to card number status changes.                               |
-| `onExpiryStatus(callback: (event: ExpiryStatusEvent, instance) => void)` | Subscribe to expiry date status changes.                               |
-| `onCvvStatus(callback: (event: CvvStatusEvent, instance) => void)`       | Subscribe to CVV status changes.                                       |
-| `onAllValid(callback: (event: AllValidEvent, instance) => void)`         | Subscribe to "all fields valid" state changes.                         |
-| `on(eventName: string, callback: Function)`                              | Low-level subscription to any event.                                   |
-| `getState()`                                                             | Returns current state of all fields.                                   |
-| `init()`                                                                 | Starts listening to input events. Call after setting up subscriptions. |
+| Method                                                                   | Description                                                                                       |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `formatCardNumber()`                                                     | Triggers formatting on the card input using the current formatter.                                |
+| `formatExpiry()`                                                         | Triggers formatting on the expiry input.                                                          |
+| `formatCvv()`                                                            | Triggers formatting on the CVV input.                                                             |
+| `getCardType(digits: string): string`                                    | Returns card type for the given digits using the current detector.                                |
+| `onCardStatus(callback: (event: CardStatusEvent, instance) => void)`     | Subscribe to card number status changes.                                                          |
+| `onExpiryStatus(callback: (event: ExpiryStatusEvent, instance) => void)` | Subscribe to expiry date status changes.                                                          |
+| `onCvvStatus(callback: (event: CvvStatusEvent, instance) => void)`       | Subscribe to CVV status changes.                                                                  |
+| `onAllValid(callback: (event: AllValidEvent, instance) => void)`         | Subscribe to "all fields valid" state changes.                                                    |
+| `on(eventName: string, callback: Function)`                              | Low-level subscription to any event.                                                              |
+| `getState()`                                                             | Returns the full state including basic statuses, validation details, and raw data for all fields. |
+| `getCardValidationResult(): object`                                      | Returns detailed validation status for the card number field.                                     |
+| `getExpiryValidationResult(): object`                                    | Returns detailed validation status for the expiry date field.                                     |
+| `getCvvValidationResult(): object`                                       | Returns detailed validation status for the CVV field.                                             |
+| `getValidationResults(): object`                                         | Returns validation results for all three fields combined.                                         |
+| `getCardData(): object`                                                  | Returns current card number data (digits, type, completeness, etc.).                              |
+| `getExpiryData(): object`                                                | Returns current expiry data (month, year, etc.).                                                  |
+| `getCvvData(): object`                                                   | Returns current CVV data (digits, expected length, etc.).                                         |
+| `init()`                                                                 | Starts listening to input events. Call after setting up subscriptions.                            |
 
 #### Event Objects
 
@@ -226,6 +237,117 @@ new CreditCardInput({
 ```typescript
 {
     isAllValid: boolean;
+}
+```
+
+### Validation and Data Methods Return Types
+
+#### `getCardValidationResult()`
+
+```typescript
+{
+    status: 'valid' | 'invalid' | 'empty' | 'incomplete';
+    code: 'valid' | 'empty' | 'incomplete' | 'invalid_luhn';
+    message?: string;
+}
+```
+
+- `status`: Overall status of the field.
+- `code`: Specific reason for the status.
+- `message`: Human-readable explanation (if not valid).
+
+#### `getExpiryValidationResult()`
+
+```typescript
+{
+    status: 'valid' | 'invalid' | 'empty' | 'incomplete';
+    code: 'valid' | 'empty' | 'incomplete' | 'invalid_month' | 'expired' | 'future_too_far';
+    message?: string;
+}
+```
+
+#### `getCvvValidationResult()`
+
+```typescript
+{
+    status: 'valid' | 'invalid' | 'empty' | 'incomplete';
+    code: 'valid' | 'empty' | 'incomplete' | 'invalid_length';
+    message?: string;
+}
+```
+
+#### `getValidationResults()`
+
+```typescript
+{
+    card: ReturnType<CreditCardInput['getCardValidationResult']>;
+    expiry: ReturnType<CreditCardInput['getExpiryValidationResult']>;
+    cvv: ReturnType<CreditCardInput['getCvvValidationResult']>;
+    isAllValid: boolean;
+}
+```
+
+#### `getCardData()`
+
+```typescript
+{
+    value: string; // raw input value (with spaces)
+    digits: string; // only digits
+    type: string; // detected card type
+    isAmex: boolean;
+    maxDigits: number; // 15 for Amex, 16 for others
+    isValid: boolean; // Luhn result if enough digits
+    isComplete: boolean; // whether all required digits are entered
+}
+```
+
+#### `getExpiryData()`
+
+```typescript
+{
+    value: string;
+    digits: string;
+    month: number | null;
+    year: number | null;
+    isValid: boolean;
+}
+```
+
+#### `getCvvData()`
+
+```typescript
+{
+    value: string;
+    digits: string;
+    expectedLength: number;
+    isAmex: boolean;
+    isValid: boolean;
+}
+```
+
+#### `getState()`
+
+The `getState()` method now returns an extended object that includes all of the above information in addition to the legacy status fields. The full type is:
+
+```typescript
+{
+    // Basic statuses (legacy)
+    cardStatus: 'neutral' | 'valid' | 'invalid';
+    expiryStatus: 'neutral' | 'valid' | 'invalid';
+    cvvStatus: 'neutral' | 'valid' | 'invalid';
+    cardType: string;
+    isAmex: boolean;
+    allValid: boolean;
+
+    // Detailed validation results (new)
+    cardValidation: ReturnType<CreditCardInput['getCardValidationResult']>;
+    expiryValidation: ReturnType<CreditCardInput['getExpiryValidationResult']>;
+    cvvValidation: ReturnType<CreditCardInput['getCvvValidationResult']>;
+
+    // Raw data (new)
+    cardData: ReturnType<CreditCardInput['getCardData']>;
+    expiryData: ReturnType<CreditCardInput['getExpiryData']>;
+    cvvData: ReturnType<CreditCardInput['getCvvData']>;
 }
 ```
 
