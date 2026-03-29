@@ -333,6 +333,11 @@ export class CreditCardInput {
         expiryData: ReturnType<CreditCardInput["getExpiryData"]>;
         cvvData: ReturnType<CreditCardInput["getCvvData"]>;
     };
+    /**
+     * Destroy the instance: remove all DOM event listeners and clean up internal state.
+     * Call this when the component is no longer needed (e.g., in SPA page unload).
+     */
+    destroy(): void;
     #private;
 }
 /**

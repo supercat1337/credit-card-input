@@ -1,9 +1,9 @@
 {
     "name": "@supercat1337/credit-card-input",
-    "version": "1.0.3",
-    "description": "A lightweight, dependency-free credit card input formatter with automatic spacing and validation. Supports multiple card types.",
+    "version": "1.0.4",
+    "description": "A lightweight credit card input formatter with automatic spacing and validation. Supports multiple card types.",
     "license": "MIT",
-    "author": "supercat1337",
+    "author": "Albert Bazaleev",
     "homepage": "https://github.com/supercat1337/credit-card-input",
     "repository": {
         "type": "git",
@@ -49,7 +49,6 @@
         "payment",
         "validation",
         "lightweight",
-        "zero-dependencies",
         "browser",
         "esm"
     ],

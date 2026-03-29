@@ -418,6 +418,7 @@ class CreditCardInput {
     #isAmex;
     #allValid;
     #ignoreCvvLength;
+    #boundHandlers;
 
     /**
      * @param {Object} options
@@ -465,6 +466,22 @@ class CreditCardInput {
         /** @type {boolean} */ this.#isAmex = false;
         /** @type {boolean} */ this.#allValid = false;
         /** @type {boolean} */ this.#ignoreCvvLength = ignoreCvvLength;
+
+        this.#boundHandlers = {
+            onCardInput: () => {
+                this.formatCardNumber();
+                this.#updateCardStatus();
+                this.#updateCvvStatus();
+            },
+            onExpiryInput: () => {
+                this.formatExpiry();
+                this.#updateExpiryStatus();
+            },
+            onCvvInput: () => {
+                this.formatCvv();
+                this.#updateCvvStatus();
+            },
+        };
     }
     // Public methods to trigger formatting (can also be called directly)
     formatCardNumber() {
@@ -551,21 +568,9 @@ class CreditCardInput {
      */
     init() {
         // Input event handlers
-        this.cardInput.addEventListener('input', () => {
-            this.formatCardNumber();
-            this.#updateCardStatus();
-            this.#updateCvvStatus(); // CVV depends on card type
-        });
-
-        this.expiryInput.addEventListener('input', () => {
-            this.formatExpiry();
-            this.#updateExpiryStatus();
-        });
-
-        this.cvvInput.addEventListener('input', () => {
-            this.formatCvv();
-            this.#updateCvvStatus();
-        });
+        this.cardInput.addEventListener('input', this.#boundHandlers.onCardInput);
+        this.expiryInput.addEventListener('input', this.#boundHandlers.onExpiryInput);
+        this.cvvInput.addEventListener('input', this.#boundHandlers.onCvvInput);
 
         // Initial update
         this.#updateCardStatus();
@@ -587,7 +592,7 @@ class CreditCardInput {
     // ---------- Private methods ----------
 
     #updateCardStatus() {
-        const value = this.cardInput.value;
+        const value = this.cardInput?.value || '';
         const digits = value.replace(/\D/g, '');
         const isAmex = isProbablyAmex(digits);
         const maxDigits = isAmex ? 15 : 16;
@@ -621,7 +626,7 @@ class CreditCardInput {
     }
 
     #updateExpiryStatus() {
-        const value = this.expiryInput.value;
+        const value = this.expiryInput?.value || '';
         const digits = value.replace(/\D/g, '');
         /** @type {Status} */
         let status = 'neutral';
@@ -664,7 +669,7 @@ class CreditCardInput {
     }
 
     #updateCvvStatus() {
-        const value = this.cvvInput.value;
+        const value = this.cvvInput?.value || '';
         const digits = value.replace(/\D/g, '');
         const isAmex = this.#isAmex;
         const expectedLength = isAmex ? 4 : 3;
@@ -1022,6 +1027,24 @@ class CreditCardInput {
             expiryData: this.getExpiryData(),
             cvvData: this.getCvvData(),
         };
+    }
+
+    /**
+     * Destroy the instance: remove all DOM event listeners and clean up internal state.
+     * Call this when the component is no longer needed (e.g., in SPA page unload).
+     */
+    destroy() {
+        // Remove DOM event listeners
+        this.cardInput?.removeEventListener('input', this.#boundHandlers.onCardInput);
+        this.expiryInput?.removeEventListener('input', this.#boundHandlers.onExpiryInput);
+        this.cvvInput?.removeEventListener('input', this.#boundHandlers.onCvvInput);
+
+        // Nullify references to help garbage collection
+        this.eventEmitter = null;
+        this.#boundHandlers = null;
+        this.cardInput = null;
+        this.expiryInput = null;
+        this.cvvInput = null;
     }
 }
 
